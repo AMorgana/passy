@@ -31,7 +31,7 @@ def assemble_passphrase(words_list, symbols_used, use_single_symbol):
     passphrase = ''
     count = len(words_list)
     # If the user just wants to use a single symbol, we'll randomly select 1 index from the length of symbols
-    if use_single_symbol:
+    if use_single_symbol and symbols_used:
         sing_sym = symbols_used[secrets.randbelow(len(symbols_used))]
     for i, word in enumerate(words_list):
         passphrase += word
