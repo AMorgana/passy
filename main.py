@@ -1,16 +1,73 @@
 import customtkinter as ctk
-# import generator as gen
+import generator as gen
+import json
+import os
+from PIL import Image
+
 
 # Set the theme and color
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
 class PassphraseApp(ctk.CTk):
+    def load_settings(self):
+        # Check if settings json exists then open it
+        if os.path.exists("settings.json"):
+            with open("settings.json", "r") as f:
+                data = json.load(f)
+
+                #apply saved values to widgets
+                #slider and entry
+                count = data.get("word_count", 4)
+                self.words_slider.set(count)
+                self.update_slider_label(count)
+                self.separator_entry.delete(0, "end")
+                self.separator_entry.insert(0, data.get("separator", "!@#$%^&*-"))
+                if data.get("use_single_symbol"): self.single_symbol_cb.select()
+                if data.get("include_number"): self.number_cb.select()
+                if data.get("capitalize"): self.capitalize_cb.select()
+
+    def on_closing(self):
+        settings = {
+            "word_count": int(self.words_slider.get()),
+            "separator": self.separator_entry.get(),
+            "use_single_symbol": self.single_symbol_cb.get(),
+            "include_number": self.number_cb.get(),
+            "capitalize": self.capitalize_cb.get(),
+            # "word_list": self.word_pool.get()
+        }
+        with open("settings.json", "w") as f:
+            json.dump(settings,f,indent=4)
+        self.destroy()
+
+
+    def generate_passphrase(self):
+        # Gather values from UI
+        count = int(self.words_entry.get())
+        symbols = self.separator_entry.get()
+
+        # Check box values (1= True, 0 = False)
+        use_digit = self.number_cb.get()
+        use_caps = self.capitalize_cb.get()
+        use_single = self.single_symbol_cb.get()
+
+        # Call the logic from generator.py
+        selected = gen.select_random_words(self.word_pool,count)
+
+        # use complexity function
+        complex_words = gen.add_word_complexity(selected,use_digit,use_caps)
+
+        result = gen.assemble_passphrase(complex_words, symbols, use_single)
+
+        # Update display box
+        self.passphrase_entry.delete(0, "end")
+        self.passphrase_entry.insert(0, result)
+
     def update_slider_label(self, value):
         self.words_entry.delete(0, "end")
         self.words_entry.insert(0, int(value))
 
-    def update_slider_from_entry(self, value):
+    def update_slider_from_entry(self):
         try:
             user_input = self.words_entry.get()
             new_val = int(user_input)
@@ -29,12 +86,31 @@ class PassphraseApp(ctk.CTk):
             self.words_entry.delete(0, "end")
             self.words_entry.insert(0,str(current_slider_val))
 
+    def change_word_count(self, amount):
+        # get current slider value
+        current_slider_val = int(self.words_entry.get())
+        # calc the new value
+        new_val = current_slider_val + amount
+        # check boundaries
+        if 2 <= new_val <= 20:
+            self.words_slider.set(new_val)
+            self.update_slider_label(new_val)
+
+    def copy_to_clipboard(self):
+        # clear the system clipboard first
+        self.clipboard_clear()
+
+        # get the current text from the passphrase entry field and append to clipboard
+        text_to_copy = self.passphrase_entry.get()
+        self.clipboard_append(text_to_copy)
+
     def __init__(self):
         super().__init__()
         #set font
         self.main_font = ctk.CTkFont(family="Arial", size=30)
         # 1. Main Window Setup
         self.title("Passy")
+        self.word_pool = gen.load_words("eff_words.txt")
         self.geometry("900x750")
 
         # This makes the middle part of the app stretch if we resize it
@@ -46,6 +122,12 @@ class PassphraseApp(ctk.CTk):
         self.header_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.header_frame.grid(row=0, column=0, padx=20, pady=10, sticky="nsew")
 
+        # Load banner image
+        banner_img = Image.open("passy.jpg")
+        self.header_image = ctk.CTkImage(banner_img, size=(860, 150))
+        self.logo_label = ctk.CTkLabel(self.header_frame, image=self.header_image, text="")
+        self.logo_label.grid(row=0, column=0, sticky="nsew")
+
         # Result Frame (The big password display)
         self.result_frame = ctk.CTkFrame(self, corner_radius=10)
         self.result_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
@@ -55,11 +137,11 @@ class PassphraseApp(ctk.CTk):
         self.passphrase_entry.grid(row=0, column=0, padx=(20, 10), pady=10, sticky="ew")
 
         # copy button
-        self.copy_btn = ctk.CTkButton(self.result_frame, text="Copy", width=60, height=60)
+        self.copy_btn = ctk.CTkButton(self.result_frame, text="Copy", width=60, height=60, command=self.copy_to_clipboard)
         self.copy_btn.grid(row=0, column=1, padx=(5, 20), pady=20, sticky="e")
 
         # The Generate Button
-        self.generate_btn = ctk.CTkButton(self.result_frame, text="Generate", font=self.main_font,height=50, width=150, corner_radius=25)
+        self.generate_btn = ctk.CTkButton(self.result_frame, text="Generate", font=self.main_font,height=50, width=150, corner_radius=25, command=self.generate_passphrase)
         self.generate_btn.grid(row=1, column=0, columnspan=2, padx=(20,20), pady=(5,20), sticky="nsew")
 
         self.result_frame.grid_columnconfigure(0, weight=1)
@@ -84,6 +166,14 @@ class PassphraseApp(ctk.CTk):
         self.words_entry.insert(0, "4") #set initial value
         self.words_entry.bind("<Return>", self.update_slider_from_entry)
         self.words_entry.bind("<FocusOut>", self.update_slider_from_entry)
+
+        # A.4 add stepper buttons
+        self.up_btn = ctk.CTkButton(
+            self.options_frame,text="▲", width=40, font=("Arial",20),command=lambda: self.change_word_count(1))
+        self.up_btn.grid(row=0, column=3, padx = 2, pady = 10)
+
+        self.down_btn = ctk.CTkButton(self.options_frame,text="▼", width=40, font=("Arial",20),command=lambda: self.change_word_count(-1))
+        self.down_btn.grid(row=0, column=4, padx = 2, pady = 10)
 
         # B.1 Word Separator Label (column 0
         self.separator_label = ctk.CTkLabel(self.options_frame, text="Word Separator:", font=self.main_font)
@@ -110,6 +200,9 @@ class PassphraseApp(ctk.CTk):
         self.capitalize_cb = ctk.CTkCheckBox(self.options_frame, text=" Capitalize", font=self.main_font)
         self.capitalize_cb.grid(row=3, column=0, padx = 10, pady = 10, sticky="w")
 
+        # save settings on close
+        self.load_settings()
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
 if __name__ == "__main__":
     app = PassphraseApp()
