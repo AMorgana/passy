@@ -3,6 +3,7 @@ import generator as gen
 import json
 import os
 from PIL import Image
+# from zxcvbn import zxcvbn
 
 
 # Set the theme and color
@@ -62,6 +63,68 @@ class PassphraseApp(ctk.CTk):
         # Update display box
         self.passphrase_entry.delete(0, "end")
         self.passphrase_entry.insert(0, result)
+
+        # # evaluate with zxcvbn
+        # strength_data = zxcvbn(result)
+        # score = strength_data["score"]
+        #
+        # # map score to color
+        # color_map = {
+        #     0: "#8B0000",  # Dark Red (Very Weak)
+        #     1: "#B22222",  # Firebrick (Weak)
+        #     2: "#DAA520",  # Goldenrod (Fair)
+        #     3: "#556B2F",  # Dark Olive Green (Good)
+        #     4: "#228B22"   # Forest Green (Strong)
+        # }
+        #
+        # # apply color to header frame
+        # new_bg_color = color_map.get(score, "transparent")
+        # self.header_frame.configure(fg_color=new_bg_color)
+
+        # 2. Calculate Theoretical Entropy
+        # We pass the length of your current wordlist (assuming it's a list called self.wordlist)
+        # Update 'len(self.wordlist)' to whatever variable holds your 7776 words!
+        bits = gen.calculate_entropy(
+            word_count=int(self.words_slider.get()),
+            list_length=len(self.word_pool),
+            use_caps=self.capitalize_cb.get(),
+            include_number=self.number_cb.get(),
+            separator_string=self.separator_entry.get(),
+            use_single_symbol=self.single_symbol_cb.get()
+        )
+
+        # 3. Determine Color based on strictly mathematical Entropy!
+        if  bits < 30:
+            rarity = "Get your shit together"
+            new_bg_color = "#D44300"
+        elif bits < 44:
+            rarity = "Ehhh"
+            new_bg_color = "#D48D00"
+        elif bits < 64:
+            rarity = "You can do it!"
+            new_bg_color = "#A39B00"
+        elif bits < 77:
+            rarity = "Great"
+            new_bg_color = "#73DE07"
+        elif bits < 85:
+            rarity = "Better"
+            new_bg_color = "#3D7300"
+        elif bits < 100:
+            rarity = "Is it hard in here, or is it just me?"
+            new_bg_color = "#00C0D4"
+        else:
+            rarity = "Legendary"
+            new_bg_color = "#DAA520"
+
+        # Apply the color to the header frame
+        self.header_frame.configure(fg_color=new_bg_color)
+
+        self.rarity_label.configure(text=f"Entropy: {rarity}")
+
+        # Display the entropy on the UI 🖥️
+        self.entropy_label.configure(text=f"Est. Entropy: {bits} bits")
+
+
 
     def update_slider_label(self, value):
         self.words_entry.delete(0, "end")
@@ -123,10 +186,14 @@ class PassphraseApp(ctk.CTk):
         self.header_frame.grid(row=0, column=0, padx=20, pady=10, sticky="nsew")
 
         # Load banner image
-        banner_img = Image.open("passy.jpg")
+        banner_img = Image.open("passy_logo.png")
         self.header_image = ctk.CTkImage(banner_img, size=(860, 150))
         self.logo_label = ctk.CTkLabel(self.header_frame, image=self.header_image, text="")
         self.logo_label.grid(row=0, column=0, sticky="nsew")
+
+        # rarity label (starts empty)
+        self.rarity_label = ctk.CTkLabel(self.header_frame, text="Entropy: --", font=("Arial", 20, "bold"), text_color="white")
+        self.rarity_label.grid(row=1, column=0, pady=(10,0))
 
         # Result Frame (The big password display)
         self.result_frame = ctk.CTkFrame(self, corner_radius=10)
@@ -145,6 +212,10 @@ class PassphraseApp(ctk.CTk):
         self.generate_btn.grid(row=1, column=0, columnspan=2, padx=(20,20), pady=(5,20), sticky="nsew")
 
         self.result_frame.grid_columnconfigure(0, weight=1)
+
+        # Entropy display label
+        self.entropy_label = ctk.CTkLabel(self.result_frame, text="Est. Entropy -- bits", text_color="grey", font=("Arial", 16))
+        self.entropy_label.grid(row=2, column=0, pady=(0,10))
 
         # Options Frame (Sliders, Checks, etc.)
         self.options_frame = ctk.CTkFrame(self)

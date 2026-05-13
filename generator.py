@@ -1,4 +1,36 @@
 import secrets
+import math
+
+def calculate_entropy(word_count, list_length, use_caps, include_number, separator_string, use_single_symbol):
+    """Calculates the theoretical entropy of the generated passphrase."""
+
+    # 1. Base word entropy
+    # If list_length is 7776, math.log2(7776) is ~12.92 bits per word
+    entropy = word_count * math.log2(list_length)
+
+    # 2. Capitalization Bonus
+    if use_caps:
+        # Assuming you randomly capitalize one character/word.
+        # It adds roughly 4 to 5 bits of entropy.
+        entropy += math.log2(word_count)
+
+        # 3. Number Bonus
+    if include_number:
+        # Choosing 1 random digit (0-9) adds exactly log2(10) bits
+        entropy += math.log2(10)
+
+        # 4. Symbol Bonus
+    if separator_string:
+        # Removing duplicates from the string to get the true pool of unique symbols
+        unique_symbols = len(set(separator_string))
+        if unique_symbols > 0:
+            if use_single_symbol:
+                entropy += math.log2(unique_symbols)
+            else:
+                num_gaps = word_count - 1
+                if num_gaps > 0:
+                    entropy += num_gaps * math.log2(unique_symbols)
+    return round(entropy, 1)
 
 def load_words(filename):
     # open the file and create the list
